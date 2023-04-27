@@ -1,0 +1,181 @@
+---
+title: "dados tartarugas"
+author: "Mariana Burato"
+date: "2023-04-26"
+output: html_document
+---
+
+```{r}
+#carregando os pacotes
+library(rgbif)
+library(tidyverse)
+library(rgbif)
+library(dplyr)
+```
+
+```{r}
+# checar funcoes
+?occ_data
+
+```
+
+```{r}
+# baixar ocorrencias
+chel_gbif <- occ_data(scientificName = "Chelonia mydas", 
+                      hasCoordinate = TRUE,
+                      hasGeospatialIssue=FALSE)
+
+```
+
+```{r}
+# dimensoes
+dim(chel_gbif)
+
+dim(chel_gbif$data)
+
+```
+
+
+```{r}
+# checar campos
+chel_gbif$data %>% names
+chel_gbif
+
+
+gbif_issues()
+
+chel_gbif1 <- chel_gbif$data %>%
+  dplyr::select(scientificName, acceptedScientificName, decimalLatitude, decimalLongitude,
+                issues,sex,occurrenceRemarks,lifeStage,identificationID,country,iucnRedListCategory, occurrenceStatus,datasetName, recordedBy, locality)
+chel_gbif1 <- chel_gbif1 %>% 
+  distinct() 
+
+```
+
+```{r}
+# checar niveis dos fatores
+lapply(chel_gbif1, unique)
+
+#carregando os acotes
+
+library(bdc)
+library(CoordinateCleaner)
+library(Rcpp)
+
+
+```
+
+```{r}
+
+# checar coordenadas válidas
+check_pf <- 
+  bdc::bdc_coordinates_outOfRange(
+    data = chel_gbif1,
+    lat = "decimalLatitude",
+    lon = "decimalLongitude")
+
+```
+
+```{r}
+
+# checar coordenadas válidas e próximas a capitais (muitas vezes as coordenadas são erroneamente associadas a capitais dos países)
+
+cl <- chel_gbif1 %>%
+  select(acceptedScientificName, decimalLatitude, decimalLongitude) %>%
+  rename(decimallongitude = decimalLongitude,
+         decimallatitude = decimalLatitude,
+         scientificName = acceptedScientificName) %>% 
+  as_tibble() %>% 
+  mutate(val = cc_val(., value = "flagged"),
+         sea = cc_sea(., value = "flagged"),
+         capital = cc_cap(., value = "flagged"))
+
+```
+
+```{r}
+# capitais (padrão é um raio de 10km)
+cl %>% 
+  rename(decimalLongitude = decimallongitude,
+         decimalLatitude = decimallatitude) %>% 
+  bdc::bdc_quickmap(., col_to_map = "capital") 
+
+cl %>% 
+  rename(decimalLongitude = decimallongitude,
+         decimalLatitude = decimallatitude) %>% 
+  bdc::bdc_quickmap(., col_to_map = "sea") 
+
+
+```
+
+```{r}
+##Nessa parte eu escolhi a variavel "country" pra saber os locais de ocorrencia mencionados.
+
+# investigar niveis suspeitos
+chel_gbif1 %>% 
+  distinct(country) %>% 
+  pull()
+```
+
+```{r}
+
+# waterBody
+chel_gbif1 %>%
+  group_by(country) %>% 
+  summarise(occ = length(scientificName)) %>% 
+  ggplot(aes(occ, y=country)) +
+  geom_bar(stat = 'identity') 
+
+
+```
+
+```{r}
+
+## carregando os pacotes para criar mapas e graficos mais dinamicos
+
+library(ggmap)
+library(maps)
+library(mapdata)
+
+ggplot2::map_data('world')
+world <- map_data('world')
+
+```
+
+```{r}
+
+# checar pontos
+
+ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group)) +
+  coord_fixed() +
+  theme_classic() +
+  geom_point(data = chel_gbif1, aes(x = decimalLongitude, y = decimalLatitude), color = "green") +
+  labs(x = "longitude", y = "latitude", title = expression(italic("Chelonia mydas")))
+
+
+
+```
+
+```{r}
+# FIM! NAO TEM DADOS DE PROFUNDIDADE PARA MINHA ESPECIE > CHELONIA MYDAS
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
